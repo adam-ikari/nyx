@@ -4,7 +4,6 @@ export interface BrowserLLMConfig {
   model: string;
   temperature?: number;
   maxTokens?: number;
-  useLocalModels?: boolean;  // Use locally deployed models
 }
 
 export interface DetectionResult {
@@ -42,9 +41,6 @@ If no sensitive information found, return empty array: []
 Text to analyze:
 `;
 
-// Local model configuration
-const WEBLLM_VERSION = 'v0_2_49';
-
 // Model library file mapping
 const MODEL_LIB_FILES: Record<string, string> = {
   'Llama-3.2-1B-Instruct-q4f16_1-MLC': 'Llama-3_2-1B-Instruct-q4f16_1-ctx4k_cs1k-webgpu.wasm',
@@ -58,14 +54,12 @@ export class BrowserLLMDetector {
   private modelId: string;
   private temperature: number;
   private maxTokens: number;
-  private useLocalModels: boolean;
   private loadingCallback?: (progress: number, text: string) => void;
 
   constructor(config: BrowserLLMConfig) {
     this.modelId = config.model;
     this.temperature = config.temperature ?? 0.1;
     this.maxTokens = config.maxTokens ?? 2048;
-    this.useLocalModels = config.useLocalModels ?? false;
   }
 
   onLoading(callback: (progress: number, text: string) => void) {
@@ -75,42 +69,32 @@ export class BrowserLLMDetector {
   async initialize(): Promise<void> {
     if (this.engine) return;
 
-    // Set up progress callback
-    const initProgressCallback = (report: webllm.InitProgressReport) => {
-      if (this.loadingCallback) {
-        this.loadingCallback(report.progress, report.text);
-      }
+    const modelLibFile = MODEL_LIB_FILES[this.modelId];
+    if (!modelLibFile) {
+      throw new Error(`Unknown model: ${this.modelId}`);
+    }
+
+    const appConfig: webllm.AppConfig = {
+      model_list: [
+        {
+          model: `/models/${this.modelId}`,
+          model_id: this.modelId,
+          model_lib: `/models/${this.modelId}/${modelLibFile}`,
+        }
+      ],
     };
 
-    if (this.useLocalModels) {
-      // Use locally deployed models from /models/
-      const modelLibFile = MODEL_LIB_FILES[this.modelId];
-      if (!modelLibFile) {
-        throw new Error(`Unknown model: ${this.modelId}`);
-      }
-
-      const appConfig: webllm.AppConfig = {
-        model_list: [
-          {
-            model: `/models/${this.modelId}`,  // Local path
-            model_id: this.modelId,
-            model_lib: `/models/${this.modelId}/${modelLibFile}`,  // Local WASM
+    this.engine = await webllm.CreateMLCEngine(
+      this.modelId,
+      {
+        appConfig,
+        initProgressCallback: (report: webllm.InitProgressReport) => {
+          if (this.loadingCallback) {
+            this.loadingCallback(report.progress, report.text);
           }
-        ],
-      };
-
-      // Use CreateMLCEngine for local models (supports appConfig)
-      this.engine = await webllm.CreateMLCEngine(
-        this.modelId,
-        { appConfig, initProgressCallback }
-      );
-    } else {
-      // Use HuggingFace (online) - use CreateMLCEngine with progress callback
-      this.engine = await webllm.CreateMLCEngine(
-        this.modelId,
-        { initProgressCallback }
-      );
-    }
+        }
+      }
+    );
   }
 
   async detect(text: string): Promise<DetectionResult> {
@@ -129,7 +113,6 @@ export class BrowserLLMDetector {
     const content = response.choices[0]?.message?.content || '[]';
 
     try {
-      // Extract JSON from response (handle markdown code blocks)
       let jsonStr = content.trim();
       if (jsonStr.startsWith('```')) {
         jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```/g, '');
@@ -137,7 +120,6 @@ export class BrowserLLMDetector {
 
       const items = JSON.parse(jsonStr);
 
-      // Find positions in original text
       const sensitive = items.map((item: { type: string; value: string; description?: string }) => {
         const start = text.indexOf(item.value);
         return {
@@ -149,10 +131,7 @@ export class BrowserLLMDetector {
         };
       }).filter((item: { type: string; value: string; start: number; end: number; description?: string }) => item.start >= 0);
 
-      return {
-        sensitive,
-        scene: 'llm_detection',
-      };
+      return { sensitive, scene: 'llm_detection' };
     } catch (e) {
       console.error('Failed to parse LLM response:', content, e);
       return { sensitive: [], scene: 'llm_detection' };
@@ -167,10 +146,10 @@ export class BrowserLLMDetector {
   }
 }
 
-// Available models for browser
+// Available models (must be deployed to public/models/)
 export const AVAILABLE_BROWSER_MODELS = [
-  { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', name: 'Llama 3.2 1B (4-bit)', size: '~700MB', recommended: true },
-  { id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', name: 'Qwen 2.5 1.5B (4-bit)', size: '~1GB' },
-  { id: 'gemma-2-2b-it-q4f16_1-MLC', name: 'Gemma 2 2B (4-bit)', size: '~1.4GB' },
-  { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC', name: 'Phi-3.5 Mini (4-bit)', size: '~2GB' },
+  { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', name: 'Llama 3.2 1B', size: '~700MB', recommended: true },
+  { id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', name: 'Qwen 2.5 1.5B', size: '~1GB' },
+  { id: 'gemma-2-2b-it-q4f16_1-MLC', name: 'Gemma 2 2B', size: '~1.4GB' },
+  { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC', name: 'Phi-3.5 Mini', size: '~2GB' },
 ];

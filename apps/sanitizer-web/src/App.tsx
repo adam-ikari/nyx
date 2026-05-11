@@ -5,12 +5,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { BrowserLLMDetector, AVAILABLE_BROWSER_MODELS } from '@/lib/browser-llm'
 
-interface BrowserSupport {
-  webgpu: boolean
-  caches: boolean
-  networkOnline: boolean
-}
-
 export function App() {
   const [mode, setMode] = useState<'sanitize' | 'restore'>('sanitize')
   const [inputText, setInputText] = useState('')
@@ -22,55 +16,32 @@ export function App() {
   const [sensitiveCount, setSensitiveCount] = useState(0)
 
   // WebLLM state
-  const [modelId, setModelId] = useState(AVAILABLE_BROWSER_MODELS[0].id) // Default to smallest (Llama 3.2 1B)
+  const [modelId, setModelId] = useState(AVAILABLE_BROWSER_MODELS[0].id)
   const [detector, setDetector] = useState<BrowserLLMDetector | null>(null)
   const [modelLoading, setModelLoading] = useState(false)
   const [modelLoadingText, setModelLoadingText] = useState('')
   const [modelLoadingProgress, setModelLoadingProgress] = useState(0)
-  const [browserSupport, setBrowserSupport] = useState<BrowserSupport | null>(null)
+  const [webgpuAvailable, setWebgpuAvailable] = useState(false)
   const [mapping, setMapping] = useState<Map<string, string>>(new Map())
-  const [useLocalModels, setUseLocalModels] = useState(false)  // Toggle for offline models
 
-  // Check browser support on mount
+  // Check WebGPU support on mount
   useEffect(() => {
-    const support: BrowserSupport = {
-      webgpu: 'gpu' in navigator,
-      caches: 'caches' in window,
-      networkOnline: navigator.onLine,
-    }
-    setBrowserSupport(support)
-
-    const handleOnline = () => setBrowserSupport(prev => prev ? { ...prev, networkOnline: true } : null)
-    const handleOffline = () => setBrowserSupport(prev => prev ? { ...prev, networkOnline: false } : null)
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
+    setWebgpuAvailable('gpu' in navigator)
   }, [])
 
   const loadModel = useCallback(async () => {
-    if (!browserSupport?.webgpu) {
+    if (!webgpuAvailable) {
       setError('WebGPU not available. Please use Chrome/Edge 113+.')
-      return
-    }
-    if (!browserSupport?.caches) {
-      setError('Cache API not available. Cannot store models.')
-      return
-    }
-    if (!useLocalModels && !browserSupport?.networkOnline) {
-      setError('Network offline. Cannot download models from HuggingFace. Enable offline mode to use local models.')
       return
     }
 
     setModelLoading(true)
     setModelLoadingProgress(0)
-    setModelLoadingText('Initializing...')
+    setModelLoadingText('Loading model from local assets...')
     setError(null)
 
     try {
-      const newDetector = new BrowserLLMDetector({ model: modelId, useLocalModels })
+      const newDetector = new BrowserLLMDetector({ model: modelId })
       newDetector.onLoading((progress, text) => {
         setModelLoadingProgress(progress)
         setModelLoadingText(text)
@@ -85,7 +56,7 @@ export function App() {
     } finally {
       setModelLoading(false)
     }
-  }, [modelId, browserSupport, useLocalModels])
+  }, [modelId, webgpuAvailable])
 
   const handleProcess = useCallback(async () => {
     if (!inputText.trim()) {
@@ -106,12 +77,10 @@ export function App() {
       if (mode === 'sanitize') {
         const result = await detector.detect(inputText)
 
-        // Create sanitized text with placeholders
         let sanitized = inputText
         const newMapping = new Map<string, string>()
         let index = 1
 
-        // Sort by position (reverse) to replace from end to start
         const sortedSensitive = [...result.sensitive].sort((a, b) => b.start - a.start)
 
         for (const item of sortedSensitive) {
@@ -127,7 +96,6 @@ export function App() {
         setSensitiveCount(result.sensitive.length)
         setSuccess(`Found ${result.sensitive.length} sensitive items`)
       } else {
-        // Restore mode
         let restored = inputText
         let complete = true
 
@@ -181,37 +149,25 @@ export function App() {
           </p>
         </div>
 
-        {/* Browser Support & Model Selection */}
+        {/* Model Selection */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <RefreshCw className="h-5 w-5" />
-              WebLLM Model
+              Local Model
             </CardTitle>
             <CardDescription>
-              Models run entirely in your browser using WebGPU
+              Models run entirely in your browser using WebGPU (loaded from local assets)
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Browser Support */}
-            {browserSupport && (
-              <div className="mb-4 p-3 rounded-lg bg-muted text-sm">
-                <div className="flex flex-wrap gap-4">
-                  <span className="flex items-center gap-1">
-                    {browserSupport.webgpu ? <CheckCircle className="h-4 w-4 text-green-500" /> : <AlertCircle className="h-4 w-4 text-red-500" />}
-                    WebGPU
-                  </span>
-                  <span className="flex items-center gap-1">
-                    {browserSupport.caches ? <CheckCircle className="h-4 w-4 text-green-500" /> : <AlertCircle className="h-4 w-4 text-red-500" />}
-                    Cache API
-                  </span>
-                  <span className="flex items-center gap-1">
-                    {browserSupport.networkOnline ? <CheckCircle className="h-4 w-4 text-green-500" /> : <AlertCircle className="h-4 w-4 text-yellow-500" />}
-                    Network
-                  </span>
-                </div>
-              </div>
-            )}
+            {/* WebGPU Status */}
+            <div className="mb-4 p-3 rounded-lg bg-muted text-sm">
+              <span className="flex items-center gap-1">
+                {webgpuAvailable ? <CheckCircle className="h-4 w-4 text-green-500" /> : <AlertCircle className="h-4 w-4 text-red-500" />}
+                WebGPU {webgpuAvailable ? 'Available' : 'Not Available'}
+              </span>
+            </div>
 
             <div className="flex flex-wrap gap-4 items-end">
               <div className="space-y-2 flex-1 min-w-[200px]">
@@ -229,20 +185,7 @@ export function App() {
                   ))}
                 </select>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="offlineMode"
-                  checked={useLocalModels}
-                  onChange={(e) => setUseLocalModels(e.target.checked)}
-                  disabled={modelLoading}
-                  className="h-4 w-4"
-                />
-                <label htmlFor="offlineMode" className="text-sm text-muted-foreground">
-                  Offline mode (local models)
-                </label>
-              </div>
-              <Button onClick={loadModel} disabled={modelLoading || !browserSupport?.webgpu || !browserSupport?.caches || (!useLocalModels && !browserSupport?.networkOnline)}>
+              <Button onClick={loadModel} disabled={modelLoading || !webgpuAvailable}>
                 {modelLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
