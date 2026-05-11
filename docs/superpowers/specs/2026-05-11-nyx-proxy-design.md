@@ -1,29 +1,30 @@
-# Nyx Proxy - 隐私保护 LLM 网关设计文档
+# Nyx Proxy - Privacy-Preserving LLM Gateway Design Document
 
-## 概述
+## Overview
 
-Nyx 是一个隐私保护的 LLM 网关，利用本地模型在请求发送到云端 LLM 之前检测并替换敏感内容，在响应返回后透明地还原原始信息——无需改变应用行为。
+Nyx is a privacy-preserving LLM gateway that uses local models to detect and replace sensitive content before sending requests to cloud LLMs, and transparently restores original information after responses return—without changing application behavior.
 
-## 解决的核心问题
+## Core Problems Solved
 
-1. **合规需求** — 防止敏感数据（PII、财务信息、凭证等）发送到第三方云服务
-2. **隐私保护** — 在使用云端 LLM 时保持对数据的控制
-3. **安全审计** — 记录和审计所有发送到 LLM 的内容
+1. **Compliance Requirements** — Prevent sensitive data (PII, financial information, credentials, etc.) from being sent to third-party cloud services
+2. **Privacy Protection** — Maintain control over data while using cloud LLMs
+3. **Security Auditing** — Log and audit all content sent to LLMs
 
-## 架构设计
+## Architecture Design
 
-### 整体架构
+### Overall Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    管理中台                               │
+│                    Management Dashboard                  │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐       │
-│  │配置管理  │ │实例管理  │ │日志审计  │ │权限控制  │       │
+│  │ Config  │ │Instance │ │  Log    │ │ Access  │       │
+│  │Management│ │Management│ │ Audit  │ │ Control │       │
 │  └─────────┘ └─────────┘ └─────────┘ └─────────┘       │
-│  技术栈: Hono + React + KV/D1                           │
+│  Tech Stack: Hono + React + KV/D1                      │
 └─────────────────────────────────────────────────────────┘
                          │
-                    HTTP API (共享密钥)
+                    HTTP API (Shared Secret)
                          │
     ┌────────────────────┼────────────────────┐
     │                    │                    │
@@ -32,37 +33,37 @@ Nyx 是一个隐私保护的 LLM 网关，利用本地模型在请求发送到�
 └───────┘           └───────┘           └───────┘
 ```
 
-### 请求处理流程
+### Request Processing Flow
 
 ```
-请求 → 检测 → 替换 → 转发 → 还原 → 响应
-         │       │       │       │
-      本地LLM  映射替换  上游LLM  映射还原
+Request → Detection → Replacement → Forwarding → Restoration → Response
+              │          │            │            │
+           Local LLM  Map Replace  Upstream LLM  Map Restore
 ```
 
-## 模块设计
+## Module Design
 
-### 包结构（Monorepo）
+### Package Structure (Monorepo)
 
 ```
 nyx-proxy/
 ├── packages/
 │   ├── core/                    # @nyx-proxy/core
 │   │   ├── src/
-│   │   │   ├── detector/        # 检测引擎
-│   │   │   ├── transformer/     # 替换引擎
-│   │   │   ├── restorer/        # 还原引擎
-│   │   │   ├── proxy/           # 代理转发
-│   │   │   ├── types/           # 类型定义
-│   │   │   └── interfaces/      # 接口定义
+│   │   │   ├── detector/        # Detection engine
+│   │   │   ├── transformer/     # Replacement engine
+│   │   │   ├── restorer/        # Restoration engine
+│   │   │   ├── proxy/           # Proxy forwarding
+│   │   │   ├── types/           # Type definitions
+│   │   │   └── interfaces/      # Interface definitions
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
 │   ├── backends/                # @nyx-proxy/backends
 │   │   ├── src/
-│   │   │   ├── node/            # Node.js 实现
-│   │   │   ├── worker/          # Cloudflare Worker 实现
-│   │   │   └── index.ts         # 条件编译入口
+│   │   │   ├── node/            # Node.js implementation
+│   │   │   ├── worker/          # Cloudflare Worker implementation
+│   │   │   └── index.ts         # Conditional compilation entry
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
@@ -74,10 +75,10 @@ nyx-proxy/
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
-│   └── dashboard/               # @nyx-proxy/dashboard（后续版本）
+│   └── dashboard/               # @nyx-proxy/dashboard (future version)
 │       ├── src/
-│       │   ├── client/          # React 前端
-│       │   └── shared/          # 共享类型
+│       │   ├── client/          # React frontend
+│       │   └── shared/          # Shared types
 │       ├── package.json
 │       └── tsconfig.json
 │
@@ -87,42 +88,42 @@ nyx-proxy/
 └── README.md
 ```
 
-### 核心模块（`@nyx-proxy/core`）
+### Core Module (`@nyx-proxy/core`)
 
 ```
 @nyx-proxy/core
 ├── detector/
-│   ├── Detector.ts              # 检测引擎
-│   └── prompts/                 # 提示词模板
+│   ├── Detector.ts              # Detection engine
+│   └── prompts/                 # Prompt templates
 ├── transformer/
-│   ├── Transformer.ts           # 替换引擎
-│   └── Mapper.ts                # 动态映射管理
+│   ├── Transformer.ts           # Replacement engine
+│   └── Mapper.ts                # Dynamic mapping management
 ├── restorer/
-│   └── Restorer.ts              # 还原引擎（流式处理）
+│   └── Restorer.ts              # Restoration engine (streaming)
 ├── proxy/
-│   └── Proxy.ts                 # 代理转发
+│   └── Proxy.ts                 # Proxy forwarding
 ├── types/
-│   └── index.ts                 # 共享类型定义
+│   └── index.ts                 # Shared type definitions
 └── interfaces/
-    ├── ILogger.ts               # 日志接口
-    ├── IHttpClient.ts           # HTTP 客户端接口
-    ├── IStorage.ts              # 存储接口
-    └── ILLMClient.ts            # 本地 LLM 客户端接口
+    ├── ILogger.ts               # Logger interface
+    ├── IHttpClient.ts           # HTTP client interface
+    ├── IStorage.ts              # Storage interface
+    └── ILLMClient.ts            # Local LLM client interface
 ```
 
-### 后端模块（`@nyx-proxy/backends`）
+### Backend Module (`@nyx-proxy/backends`)
 
 ```
 @nyx-proxy/backends
-├── interfaces/                  # 继承 core/interfaces
-├── node/                        # Node.js 实现
+├── interfaces/                  # Inherits core/interfaces
+├── node/                        # Node.js implementation
 │   ├── logger/
 │   │   └── FileLogger.ts
 │   ├── http/
 │   │   └── NodeHttpClient.ts
 │   └── storage/
 │       └── LocalStorage.ts
-├── worker/                      # Cloudflare Worker 实现（后续版本）
+├── worker/                      # Cloudflare Worker implementation (future)
 │   ├── logger/
 │   │   └── KVLogger.ts
 │   ├── http/
@@ -130,110 +131,110 @@ nyx-proxy/
 │   └── storage/
 │       ├── KVStorage.ts
 │       └── R2Storage.ts
-└── index.ts                     # 条件编译入口
+└── index.ts                     # Conditional compilation entry
 ```
 
-### CLI 模块（`@nyx-proxy/cli`）
+### CLI Module (`@nyx-proxy/cli`)
 
 ```
 @nyx-proxy/cli
 ├── commands/
-│   ├── start.ts                 # 启动服务（默认命令）
-│   ├── status.ts                # 查看状态
-│   └── config.ts                # 配置管理
+│   ├── start.ts                 # Start service (default command)
+│   ├── status.ts                # View status
+│   └── config.ts                # Configuration management
 ├── bin/
-│   └── nyx.ts                   # CLI 入口
+│   └── nyx.ts                   # CLI entry point
 └── utils/
-    └── config-loader.ts         # 配置加载
+    └── config-loader.ts         # Configuration loading
 ```
 
-**CLI 命令：**
+**CLI Commands:**
 
 ```bash
-nyx                            # 启动服务（默认 localhost:3000）
-nyx --port 8080                # 指定端口
-nyx --config ./nyx.json        # 指定配置文件
-nyx status                     # 查看运行状态
-nyx config init                # 生成默认配置
-nyx config show                # 显示当前配置
-nyx connect <dashboard-url>    # 连接管理中台
+nyx                            # Start service (default localhost:3000)
+nyx --port 8080                # Specify port
+nyx --config ./nyx.json        # Specify config file
+nyx status                     # View running status
+nyx config init                # Generate default config
+nyx config show                # Display current config
+nyx connect <dashboard-url>    # Connect to management dashboard
 ```
 
-### 管理中台模块（`@nyx-proxy/dashboard`）
+### Management Dashboard Module (`@nyx-proxy/dashboard`)
 
-**前端（TypeScript/React）：**
+**Frontend (TypeScript/React):**
 
 ```
 @nyx-proxy/dashboard
-├── client/                     # React 前端
+├── client/                     # React frontend
 │   ├── pages/
-│   │   ├── dashboard/          # 仪表盘
-│   │   ├── instances/          # 实例管理
-│   │   ├── config/             # 配置管理
-│   │   ├── logs/               # 日志审计
-│   │   └── settings/           # 系统设置
+│   │   ├── dashboard/          # Dashboard
+│   │   ├── instances/          # Instance management
+│   │   ├── config/             # Configuration management
+│   │   ├── logs/               # Log audit
+│   │   └── settings/           # System settings
 │   └── components/
 ├── shared/
-│   └── types.ts                # 前后端共享类型
+│   └── types.ts                # Frontend-backend shared types
 └── package.json
 ```
 
-**后端（Go，独立仓库）：**
+**Backend (Go, separate repository):**
 
-社区版和企业版中台后端使用 Go 开发，详见商业化设计章节。
+Community and enterprise dashboard backends are developed in Go, see commercialization design section.
 
-**功能分层：**
+**Feature Tiers:**
 
-| 层级 | 功能 | 个人 | 团队 | 企业 |
-|------|------|------|------|------|
-| 基础 | 配置管理、日志查看 | ✅ | ✅ | ✅ |
-| 协作 | 多用户、角色 | ❌ | ✅ | ✅ |
-| 运维 | 多实例、监控告警 | ❌ | ❌ | ✅ |
-| 企业 | 多租户、审计报表 | ❌ | ❌ | ✅ |
+| Tier | Features | Personal | Team | Enterprise |
+|------|----------|----------|------|------------|
+| Basic | Config management, log viewing | ✅ | ✅ | ✅ |
+| Collaboration | Multi-user, roles | ❌ | ✅ | ✅ |
+| Operations | Multi-instance, monitoring & alerting | ❌ | ❌ | ✅ |
+| Enterprise | Multi-tenancy, audit reports | ❌ | ❌ | ✅ |
 
-## 敏感内容检测
+## Sensitive Content Detection
 
-### 检测方式
+### Detection Method
 
-使用本地 LLM 进行语义理解来检测敏感内容。无需预定义类别——LLM 根据上下文自动识别所有敏感信息。
+Use local LLM for semantic understanding to detect sensitive content. No predefined categories needed—LLM automatically identifies all sensitive information based on context.
 
-### 提示词模板
+### Prompt Template
 
 ```
-你是一个隐私保护助手，负责检测文本中所有不应发送到外部服务的敏感信息。
+You are a privacy protection assistant responsible for detecting all sensitive information in text that should not be sent to external services.
 
-敏感信息包括但不限于：
-- 个人身份信息：姓名、电话、邮箱、身份证号、地址、照片等
-- 财务信息：银行卡号、信用卡号、金额、账户信息等
-- 认证凭证：密码、密钥、令牌、API 密钥等
-- 内部信息：项目名称、内部系统名称、员工信息、商业机密等
-- 医疗信息：病历、诊断、药物等
-- 任何可能泄露隐私或违反合规要求的内容
+Sensitive information includes but is not limited to:
+- Personal identity information: names, phone numbers, emails, ID numbers, addresses, photos, etc.
+- Financial information: bank card numbers, credit card numbers, amounts, account information, etc.
+- Authentication credentials: passwords, keys, tokens, API keys, etc.
+- Internal information: project names, internal system names, employee information, trade secrets, etc.
+- Medical information: medical records, diagnoses, medications, etc.
+- Any content that could leak privacy or violate compliance requirements
 
-请检测以下文本中的敏感信息，返回 JSON 数组格式：
+Please detect sensitive information in the following text and return in JSON array format:
 [
-  {"type": "PERSON", "value": "原始值", "start": 起始位置, "end": 结束位置, "context_before": "前文", "context_after": "后文"},
+  {"type": "PERSON", "value": "original value", "start": start position, "end": end position, "context_before": "preceding text", "context_after": "following text"},
   ...
 ]
 
-如果没有敏感信息，返回空数组：[]
+If no sensitive information, return empty array: []
 
-文本：
+Text:
 {input}
 ```
 
-### 本地 LLM 配置
+### Local LLM Configuration
 
-- 使用 OpenAI 兼容 API 格式
-- 支持多种检测方案：
+- Uses OpenAI-compatible API format
+- Supports multiple detection solutions:
 
-| 方案 | 说明 | 适用场景 |
-|------|------|----------|
-| Ollama | 本地部署，完全私有 | 企业内网、高安全需求 |
-| LocalAI | 本地部署，OpenAI 兼容 | 企业内网 |
-| Cloudflare AI | 无需部署，边缘低延迟 | 个人、小团队 |
+| Solution | Description | Use Case |
+|----------|-------------|----------|
+| Ollama | Local deployment, fully private | Enterprise intranet, high security requirements |
+| LocalAI | Local deployment, OpenAI compatible | Enterprise intranet |
+| Cloudflare AI | No deployment needed, edge low latency | Personal, small teams |
 
-**Cloudflare AI 配置：**
+**Cloudflare AI Configuration:**
 
 ```json
 {
@@ -247,7 +248,7 @@ nyx connect <dashboard-url>    # 连接管理中台
 }
 ```
 
-**Ollama 配置：**
+**Ollama Configuration:**
 
 ```json
 {
@@ -260,33 +261,33 @@ nyx connect <dashboard-url>    # 连接管理中台
 }
 ```
 
-- 针对 Gemma 4 / Llama 3 8B 级别模型优化（小参数量、快速推理）
-- 单次调用、结构化 JSON 输出
+- Optimized for Gemma 4 / Llama 3 8B level models (small parameters, fast inference)
+- Single call, structured JSON output
 
-## 占位符设计
+## Placeholder Design
 
-### 占位符格式
+### Placeholder Format
 
-使用唯一前缀确保不与编程场景冲突：
+Use unique prefix to ensure no conflict with programming scenarios:
 
 ```
-格式：«NYX_PERSON_1»、«NYX_PHONE_1»
+Format: «NYX_PERSON_1», «NYX_PHONE_1»
 
-示例：
-原文：请联系张三，电话13800138000
-替换：请联系 «NYX_PERSON_1»，电话 «NYX_PHONE_1»
+Example:
+Original: Please contact Zhang San, phone 13800138000
+Replaced: Please contact «NYX_PERSON_1», phone «NYX_PHONE_1»
 ```
 
-**优点：**
+**Advantages:**
 
-- `«»`（guillemets）在编程中极少使用，冲突风险极低
-- `NYX_` 前缀确保唯一性
-- 云端 LLM 能理解语义（PERSON、PHONE）
-- 广泛支持的 Unicode 字符
+- `«»` (guillemets) are rarely used in programming, extremely low conflict risk
+- `NYX_` prefix ensures uniqueness
+- Cloud LLM can understand semantics (PERSON, PHONE)
+- Widely supported Unicode characters
 
-### 防冲突机制
+### Conflict Prevention
 
-检测用户文本是否包含类似格式，如有冲突则添加随机后缀：
+Detect if user text contains similar format, add random suffix if conflict exists:
 
 ```typescript
 class RequestMapper {
@@ -295,7 +296,7 @@ class RequestMapper {
   private counter: Record<string, number> = {};
 
   constructor(originalText: string) {
-    // 检测用户文本是否包含类似格式
+    // Detect if user text contains similar format
     const conflictPattern = /«NYX_[A-Z]+_\d+»/;
     this.useRandomSuffix = conflictPattern.test(originalText);
   }
@@ -306,11 +307,11 @@ class RequestMapper {
 
     let placeholder: string;
     if (this.useRandomSuffix) {
-      // 有冲突时添加随机后缀
+      // Add random suffix when conflict exists
       const rand = randomString(4);
       placeholder = `«NYX_${type}_${index}_${rand}»`;
     } else {
-      // 无冲突使用简单格式
+      // Use simple format when no conflict
       placeholder = `«NYX_${type}_${index}»`;
     }
 
@@ -328,42 +329,42 @@ class RequestMapper {
 }
 ```
 
-### 类型语义
+### Type Semantics
 
-| 类型 | 含义 | 示例 |
-|------|------|------|
-| PERSON | 人名 | «NYX_PERSON_1» |
-| PHONE | 电话号码 | «NYX_PHONE_1» |
-| EMAIL | 电子邮箱 | «NYX_EMAIL_1» |
-| ID | 身份证件 | «NYX_ID_1» |
-| CARD | 银行卡号 | «NYX_CARD_1» |
-| ADDRESS | 地址 | «NYX_ADDRESS_1» |
-| CREDENTIAL | 凭证/密钥 | «NYX_CREDENTIAL_1» |
-| MEDICAL | 医疗信息 | «NYX_MEDICAL_1» |
-| INTERNAL | 内部信息 | «NYX_INTERNAL_1» |
+| Type | Meaning | Example |
+|------|---------|---------|
+| PERSON | Person name | «NYX_PERSON_1» |
+| PHONE | Phone number | «NYX_PHONE_1» |
+| EMAIL | Email address | «NYX_EMAIL_1» |
+| ID | Identity document | «NYX_ID_1» |
+| CARD | Bank card number | «NYX_CARD_1» |
+| ADDRESS | Address | «NYX_ADDRESS_1» |
+| CREDENTIAL | Credential/Key | «NYX_CREDENTIAL_1» |
+| MEDICAL | Medical information | «NYX_MEDICAL_1» |
+| INTERNAL | Internal information | «NYX_INTERNAL_1» |
 
-## 流式响应还原
+## Streaming Response Restoration
 
-### 缓冲替换策略
+### Buffer Replacement Strategy
 
 ```
-LLM 输出流：
-"...请联系 «NYX_PERSON_1»，电话是 «NYX_PHONE_1»..."
+LLM output stream:
+"...please contact «NYX_PERSON_1», phone is «NYX_PHONE_1»..."
 
-缓冲窗口：
-"...请联系 «NYX_PERS" → 不完整，继续缓冲
-"...请联系 «NYX_PERSON_1»" → 完整匹配，替换为"张三"，输出
-"，电话是 «NYX_PHON" → 不完整，继续缓冲
-"，电话是 «NYX_PHONE_1»" → 完整匹配，替换为"13800138000"，输出
+Buffer window:
+"...please contact «NYX_PERS" → incomplete, continue buffering
+"...please contact «NYX_PERSON_1»" → complete match, replace with "Zhang San", output
+", phone is «NYX_PHON" → incomplete, continue buffering
+", phone is «NYX_PHONE_1»" → complete match, replace with "13800138000", output
 ```
 
-### 动态缓冲大小
+### Dynamic Buffer Size
 
-- 占位符格式：`«NYX_TYPE_N»` 或 `«NYX_TYPE_N_rand»`
-- 最大预估长度：`«NYX_CREDENTIAL_99_xk9m»` = 24 字符
-- 缓冲窗口：28 字符（略大于最大占位符长度）
+- Placeholder format: `«NYX_TYPE_N»` or `«NYX_TYPE_N_rand»`
+- Maximum estimated length: `«NYX_CREDENTIAL_99_xk9m»` = 24 characters
+- Buffer window: 28 characters (slightly larger than maximum placeholder length)
 
-### 实现代码
+### Implementation Code
 
 ```typescript
 class StreamRestorer {
@@ -390,16 +391,16 @@ class StreamRestorer {
         const original = this.mapping.get(placeholder);
 
         if (original !== undefined) {
-          // 找到映射，替换并输出
+          // Found mapping, replace and output
           output += this.buffer.slice(0, match.index) + original;
           this.buffer = this.buffer.slice(match.index + placeholder.length);
         } else {
-          // 未找到映射，输出占位符原文
+          // No mapping found, output placeholder as-is
           output += this.buffer.slice(0, match.index + placeholder.length);
           this.buffer = this.buffer.slice(match.index + placeholder.length);
         }
       } else {
-        // 输出安全部分，保留可能的不完整占位符
+        // Output safe portion, preserve possible incomplete placeholder
         const safeLength = this.buffer.length - this.bufferSize;
         output += this.buffer.slice(0, safeLength);
         this.buffer = this.buffer.slice(safeLength);
@@ -410,7 +411,7 @@ class StreamRestorer {
   }
 
   flush(): string {
-    // 流结束，处理剩余缓冲
+    // Stream ended, process remaining buffer
     this.pattern.lastIndex = 0;
     const result = this.buffer.replace(this.pattern, (match) => {
       return this.mapping.get(match) || match;
@@ -421,45 +422,45 @@ class StreamRestorer {
 }
 ```
 
-## 场景扩展设计
+## Scenario Extension Design
 
-### 场景识别
+### Scenario Recognition
 
-本地 LLM 在检测敏感信息时，同时识别场景类型：
+Local LLM identifies scenario type while detecting sensitive information:
 
 ```json
 {
   "sensitive": [
-    {"type": "PERSON", "value": "张三", "start": 3, "end": 5},
+    {"type": "PERSON", "value": "Zhang San", "start": 3, "end": 5},
     {"type": "NUMBER", "value": "10000", "start": 8, "end": 13}
   ],
   "scene": "calculation",
-  "hint": "用户需要进行数值计算"
+  "hint": "User needs to perform numerical calculation"
 }
 ```
 
-### 场景类型
+### Scenario Types
 
-| 场景 | 说明 | 本地处理 |
-|------|------|----------|
-| text | 普通文本对话 | 无 |
-| calculation | 数值计算 | 执行表达式 |
-| code | 代码生成/执行 | 沙盒执行 |
+| Scenario | Description | Local Processing |
+|----------|-------------|------------------|
+| text | Normal text conversation | None |
+| calculation | Numerical calculation | Execute expression |
+| code | Code generation/execution | Sandbox execution |
 
-### 云端响应格式
+### Cloud Response Format
 
-云端 LLM 返回图灵完备的代码，本地在沙盒中安全执行：
+Cloud LLM returns Turing-complete code, executed locally in sandbox:
 
 ```json
 {
-  "response": "计算结果是 {{result}}",
+  "response": "The calculation result is {{result}}",
   "code": "return placeholder_1 - placeholder_2;"
 }
 ```
 
-### 代码执行沙盒
+### Code Execution Sandbox
 
-使用 QuickJS (WASM) 作为安全沙盒：
+Use QuickJS (WASM) as secure sandbox:
 
 ```typescript
 import { QuickJS } from 'quickjs-emscripten';
@@ -474,12 +475,12 @@ class CodeExecutor {
     const vm = new QuickJS();
 
     try {
-      // 注入占位符变量
+      // Inject placeholder variables
       for (const [key, value] of Object.entries(placeholders)) {
         vm.setGlobal(key, value);
       }
 
-      // 安全执行代码
+      // Safely execute code
       const result = await vm.evalCode(code);
       return result;
     } finally {
@@ -489,79 +490,79 @@ class CodeExecutor {
 }
 ```
 
-### 安全性保证
+### Security Guarantees
 
-| 措施 | 说明 |
-|------|------|
-| WASM 隔离 | 天然沙盒，无法访问宿主环境 |
-| 无 I/O | 无法访问文件、网络 |
-| 无外部调用 | 无法调用宿主函数 |
-| 资源限制 | 可限制执行时间和内存 |
+| Measure | Description |
+|---------|-------------|
+| WASM isolation | Natural sandbox, cannot access host environment |
+| No I/O | Cannot access files, network |
+| No external calls | Cannot call host functions |
+| Resource limits | Can limit execution time and memory |
 
-### 统一处理流程
+### Unified Processing Flow
 
 ```typescript
 async function process(input: string): Promise<string> {
-  // 1. 本地 LLM 检测
+  // 1. Local LLM detection
   const detection = await localLLM.detect(input);
 
-  // 2. 替换敏感信息
+  // 2. Replace sensitive information
   const { masked, mapping } = transformer.transform(input, detection.sensitive);
 
-  // 3. 发送云端
+  // 3. Send to cloud
   const cloudResponse = await upstream.send(masked);
 
-  // 4. 执行云端返回的代码（如有）
+  // 4. Execute code returned by cloud (if any)
   let result = cloudResponse.response;
   if (cloudResponse.code) {
     const output = await executor.execute(cloudResponse.code, mapping);
     result = result.replace('{{result}}', String(output));
   }
 
-  // 5. 还原敏感信息
+  // 5. Restore sensitive information
   return restorer.restore(result, mapping);
 }
 ```
 
-### 扩展能力
+### Extension Capabilities
 
-云端可返回任意图灵完备代码，本地沙盒执行：
+Cloud can return any Turing-complete code, executed locally in sandbox:
 
-- 数学运算
-- 字符串处理
-- 条件判断
-- 循环迭代
-- 数据聚合
+- Mathematical operations
+- String processing
+- Conditional logic
+- Loop iteration
+- Data aggregation
 
-无需预定义动作类型，模型自扩展处理方式。
+No need to predefine action types, model self-extends processing methods.
 
-## 错误处理
+## Error Handling
 
-### 错误类型与响应
+### Error Types and Responses
 
-| 错误场景 | 处理策略 | 响应 |
-|---------|---------|------|
-| 本地 LLM 超时 | 拒绝请求 | 503 Service Unavailable |
-| 本地 LLM 不可用 | 拒绝请求 | 503 Service Unavailable |
-| 上游 LLM 错误 | 透传错误 | 上游返回的错误码和消息 |
-| 认证失败 | 拒绝请求 | 401 Unauthorized |
-| 配置错误 | 启动失败 | 日志记录，进程退出 |
+| Error Scenario | Handling Strategy | Response |
+|----------------|-------------------|----------|
+| Local LLM timeout | Reject request | 503 Service Unavailable |
+| Local LLM unavailable | Reject request | 503 Service Unavailable |
+| Upstream LLM error | Pass through error | Error code and message from upstream |
+| Authentication failed | Reject request | 401 Unauthorized |
+| Configuration error | Startup failure | Log and exit process |
 
-### 错误响应格式
+### Error Response Format
 
 ```json
 {
   "error": {
     "type": "detection_timeout",
-    "message": "本地 LLM 检测超时",
+    "message": "Local LLM detection timeout",
     "request_id": "req_abc123"
   }
 }
 ```
 
-## 配置设计
+## Configuration Design
 
-### 配置结构
+### Configuration Structure
 
 ```json
 {
@@ -580,7 +581,7 @@ async function process(input: string): Promise<string> {
   },
   "detection": {
     "timeout": 15000,
-    "prompt": "可选：自定义提示词模板"
+    "prompt": "Optional: custom prompt template"
   },
   "placeholder": {
     "language": "en"
@@ -596,264 +597,264 @@ async function process(input: string): Promise<string> {
 }
 ```
 
-### 配置优先级
+### Configuration Priority
 
-1. 命令行参数
-2. 环境变量
-3. 配置文件（`./nyx.json` 或 `~/.nyx/config.json`）
-4. 默认值
+1. Command line arguments
+2. Environment variables
+3. Configuration file (`./nyx.json` or `~/.nyx/config.json`)
+4. Default values
 
-## 认证设计
+## Authentication Design
 
-### 用户 → 中台
+### User → Dashboard
 
-- JWT Token，包含角色权限
-- 标准认证流程
+- JWT Token with role permissions
+- Standard authentication flow
 
-### 中台 ↔ Nyx 实例
+### Dashboard ↔ Nyx Instance
 
-- 共享密钥
-- 中台调用 Nyx 管理 API 时在 Header 中携带共享密钥
-- Nyx 上报状态到中台时携带共享密钥验证身份
+- Shared secret
+- Dashboard carries shared secret in header when calling Nyx management API
+- Nyx carries shared secret when reporting status to dashboard for identity verification
 
-## 部署方案
+## Deployment Solutions
 
-### 部署目标
+### Deployment Targets
 
-| 规模 | Nyx 实例 | 管理中台 |
-|------|----------|----------|
-| 个人 | Docker/Worker | Docker 或 Worker（免费计划） |
-| 小团队 | Docker | Docker |
-| 中型组织 | Docker/K8s | Docker/K8s |
-| 大型企业 | K8s/网关集成 | K8s 高可用 |
+| Scale | Nyx Instance | Management Dashboard |
+|-------|--------------|----------------------|
+| Personal | Docker/Worker | Docker or Worker (free plan) |
+| Small team | Docker | Docker |
+| Medium organization | Docker/K8s | Docker/K8s |
+| Large enterprise | K8s/Gateway integration | K8s high availability |
 
-### Cloudflare Worker 存储
+### Cloudflare Worker Storage
 
-| 存储 | 免费计划 | 用途 |
-|------|----------|------|
-| KV | ✅ 自动包含 | 元数据、实例状态 |
-| R2 | ✅ 需开通 | 完整请求响应日志（可选） |
-| D1 | ✅ 需开通 | 中台数据库（可选） |
+| Storage | Free Plan | Use Case |
+|---------|-----------|----------|
+| KV | ✅ Auto-included | Metadata, instance status |
+| R2 | ✅ Needs enablement | Full request/response logs (optional) |
+| D1 | ✅ Needs enablement | Dashboard database (optional) |
 
-### 构建目标
+### Build Targets
 
 ```bash
-npm run build:node      # Node.js 产物
-npm run build:worker    # Cloudflare Worker 产物
+npm run build:node      # Node.js artifact
+npm run build:worker    # Cloudflare Worker artifact
 ```
 
-## 连接模型
+## Connection Model
 
-Nyx 实例主动连接中台：
+Nyx instances actively connect to dashboard:
 
 ```
-Nyx 启动 → 连接中台 → 注册实例 → 保持心跳 → 接收配置下发
+Nyx startup → Connect to dashboard → Register instance → Maintain heartbeat → Receive config push
 ```
 
-**优点：**
+**Advantages:**
 
-- Nyx 实例可能有动态 IP
-- 中台有固定端点
-- 无需服务发现
+- Nyx instances may have dynamic IPs
+- Dashboard has fixed endpoint
+- No service discovery needed
 
-## 技术栈总结
+## Tech Stack Summary
 
-| 组件 | 技术 |
-|------|------|
-| 核心语言 | TypeScript |
-| 核心运行时 | Node.js / Cloudflare Workers |
-| 中台前端 | React |
-| 中台后端 | Go（社区版和企业版统一） |
-| 代码沙盒 | QuickJS (WASM) |
-| 数据库 | KV（默认）/ D1（可选）/ R2（可选） |
-| 构建 | pnpm workspace |
-| 包管理 | pnpm |
+| Component | Technology |
+|-----------|------------|
+| Core language | TypeScript |
+| Core runtime | Node.js / Cloudflare Workers |
+| Dashboard frontend | React |
+| Dashboard backend | Go (unified for community and enterprise) |
+| Code sandbox | QuickJS (WASM) |
+| Database | KV (default) / D1 (optional) / R2 (optional) |
+| Build | pnpm workspace |
+| Package management | pnpm |
 
-## MVP 版本范围
+## MVP Version Scope
 
-### 包含
+### Included
 
-| 模块 | 功能 |
-|------|------|
-| @nyx-proxy/core | 检测 + 替换 + 还原 + 代理 |
-| @nyx-proxy/backends | Node.js 后端实现 |
-| @nyx-proxy/cli | 启动 + 状态 + 配置管理 |
+| Module | Features |
+|--------|----------|
+| @nyx-proxy/core | Detection + Replacement + Restoration + Proxy |
+| @nyx-proxy/backends | Node.js backend implementation |
+| @nyx-proxy/cli | Start + Status + Config management |
 
-### 不包含（后续版本）
+### Not Included (Future Versions)
 
-| 模块 | 原因 |
-|------|------|
-| @nyx-proxy/backends/worker | 先验证核心功能 |
-| @nyx-proxy/dashboard | 先验证核心功能 |
+| Module | Reason |
+|--------|--------|
+| @nyx-proxy/backends/worker | Validate core functionality first |
+| @nyx-proxy/dashboard | Validate core functionality first |
 
-### MVP 开发任务
+### MVP Development Tasks
 
-1. **项目初始化**
-   - Monorepo 结构
-   - pnpm workspace 配置
-   - TypeScript 配置
+1. **Project Initialization**
+   - Monorepo structure
+   - pnpm workspace configuration
+   - TypeScript configuration
 
 2. **@nyx-proxy/core**
-   - 类型定义
-   - 接口定义
-   - 检测引擎
-   - 替换引擎
-   - 还原引擎
-   - 代理转发
+   - Type definitions
+   - Interface definitions
+   - Detection engine
+   - Replacement engine
+   - Restoration engine
+   - Proxy forwarding
 
-3. **@nyx-proxy/backends（Node.js）**
-   - 文件日志
-   - Node HTTP 客户端
-   - 本地存储
+3. **@nyx-proxy/backends (Node.js)**
+   - File logging
+   - Node HTTP client
+   - Local storage
 
 4. **@nyx-proxy/cli**
-   - 启动命令
-   - 状态命令
-   - 配置加载
+   - Start command
+   - Status command
+   - Config loading
 
-5. **集成测试**
-   - 端到端测试
-   - 本地 LLM 连接测试
+5. **Integration Testing**
+   - End-to-end testing
+   - Local LLM connection testing
 
-## 后续扩展
+## Future Extensions
 
-- Kong/APISIX 插件集成
-- 多租户支持
-- 高级监控告警
-- 外部日志集成（Loki、ELK）
-- PostgreSQL 支持中台
+- Kong/APISIX plugin integration
+- Multi-tenancy support
+- Advanced monitoring and alerting
+- External log integration (Loki, ELK)
+- PostgreSQL support for dashboard
 
-## 商业化设计
+## Commercialization Design
 
-### 分阶段实施
+### Phased Implementation
 
-| 阶段 | 功能 | 开源/闭源 | 交付方式 |
-|------|------|-----------|----------|
-| 阶段 1 | 核心功能（代理、检测、还原、沙盒） | 开源 | GitHub + npm |
-| 阶段 2 | 社区版中台 | 开源 | Go → WASM |
-| 阶段 3 | 企业版中台 | 闭源 | Go → WASM/二进制 |
+| Phase | Features | Open/Closed Source | Delivery Method |
+|-------|----------|-------------------|-----------------|
+| Phase 1 | Core features (proxy, detection, restoration, sandbox) | Open source | GitHub + npm |
+| Phase 2 | Community dashboard | Open source | Go → WASM |
+| Phase 3 | Enterprise dashboard | Closed source | Go → WASM/Binary |
 
-### 版本对比
+### Version Comparison
 
-| 功能 | 社区版 | 企业版 |
-|------|--------|--------|
-| 核心代理 | ✅ | ✅ |
-| 敏感检测 | ✅ | ✅ |
-| 流式还原 | ✅ | ✅ |
-| 代码沙盒 | ✅ | ✅ |
-| 管理中台（基础） | ✅ | ✅ |
-| 管理中台（高级） | ❌ | ✅ |
-| 多租户 | ❌ | ✅ |
-| 审计报表 | ❌ | ✅ |
-| SSO 集成 | ❌ | ✅ |
-| 技术支持 | 社区 | 官方 |
+| Feature | Community Edition | Enterprise Edition |
+|---------|-------------------|-------------------|
+| Core proxy | ✅ | ✅ |
+| Sensitive detection | ✅ | ✅ |
+| Streaming restoration | ✅ | ✅ |
+| Code sandbox | ✅ | ✅ |
+| Management dashboard (basic) | ✅ | ✅ |
+| Management dashboard (advanced) | ❌ | ✅ |
+| Multi-tenancy | ❌ | ✅ |
+| Audit reports | ❌ | ✅ |
+| SSO integration | ❌ | ✅ |
+| Technical support | Community | Official |
 
-### 中台架构
+### Dashboard Architecture
 
-**技术栈统一：Go**
+**Unified Tech Stack: Go**
 
-| 组件 | 技术 | 说明 |
-|------|------|------|
-| 前端 | TypeScript/React | 开源，社区版和企业版复用 |
-| 后端 | Go | 社区版和企业版统一技术栈 |
+| Component | Technology | Description |
+|-----------|------------|-------------|
+| Frontend | TypeScript/React | Open source, shared by community and enterprise |
+| Backend | Go | Unified tech stack for community and enterprise |
 
-**功能模块：**
+**Feature Modules:**
 
 ```
-Go 后端代码
-    ├── 基础功能（社区版）
-    │   ├── 配置管理
-    │   ├── 实例状态
-    │   └── 日志查看
-    └── 企业功能（企业版）
-        ├── 多租户管理
-        ├── 审计报表
-        └── SSO 集成
+Go backend code
+    ├── Basic features (Community Edition)
+    │   ├── Configuration management
+    │   ├── Instance status
+    │   └── Log viewing
+    └── Enterprise features (Enterprise Edition)
+        ├── Multi-tenant management
+        ├── Audit reports
+        └── SSO integration
 ```
 
-**编译目标：**
+**Build Targets:**
 
-| 版本 | 部署方式 | 编译命令 |
-|------|----------|----------|
-| 社区版中台 | Cloudflare Worker | `tinygo build -target wasm -tags community` |
-| 企业版中台 SaaS | Cloudflare Worker | `tinygo build -target wasm -tags enterprise` |
-| 企业版中台私有 | Docker/裸机 | `go build -tags enterprise` |
+| Version | Deployment Method | Build Command |
+|---------|-------------------|---------------|
+| Community dashboard | Cloudflare Worker | `tinygo build -target wasm -tags community` |
+| Enterprise dashboard SaaS | Cloudflare Worker | `tinygo build -target wasm -tags enterprise` |
+| Enterprise dashboard private | Docker/Bare metal | `go build -tags enterprise` |
 
-**代码复用：**
+**Code Reuse:**
 
-| 代码类型 | 复用程度 | 说明 |
-|----------|----------|------|
-| 基础功能 | 100% | 社区版和企业版共享 |
-| 企业功能 | 100% | SaaS 和私有部署共享 |
-| 前端 | 100% | 社区版和企业版共享 |
+| Code Type | Reuse Level | Description |
+|-----------|-------------|-------------|
+| Basic features | 100% | Shared by community and enterprise |
+| Enterprise features | 100% | Shared by SaaS and private deployment |
+| Frontend | 100% | Shared by community and enterprise |
 
-**Go 代码量：**
+**Go Code Volume:**
 
-| 功能 | 代码量估算 |
-|------|-----------|
-| HTTP 服务 | ~50 行（使用 Gin） |
-| 基础功能（社区版） | ~350 行 |
-| 许可证验证 | ~150 行 |
-| 企业功能 | ~600 行 |
-| **总计** | **~1150 行 Go** |
+| Feature | Estimated Lines |
+|---------|-----------------|
+| HTTP service | ~50 lines (using Gin) |
+| Basic features (Community Edition) | ~350 lines |
+| License verification | ~150 lines |
+| Enterprise features | ~600 lines |
+| **Total** | **~1150 lines Go** |
 
-### 部署方式
+### Deployment Methods
 
-| 部署 | 编译目标 | 代码保护 |
-|------|----------|----------|
-| 社区版中台 | Go → WASM | 开源，代码可见 |
-| 企业版中台 SaaS | Go → WASM | 在你服务器，客户无法接触 |
-| 企业版中台私有 | Go → 二进制 | 编译后不可见/不可修改 |
+| Deployment | Build Target | Code Protection |
+|------------|--------------|-----------------|
+| Community dashboard | Go → WASM | Open source, code visible |
+| Enterprise dashboard SaaS | Go → WASM | On your server, customers cannot access |
+| Enterprise dashboard private | Go → Binary | Compiled, not visible/modifiable |
 
-### 消息队列和日志服务
+### Message Queue and Log Services
 
-| 部署方式 | 消息队列 | 日志服务 |
-|----------|----------|----------|
-| 社区版中台 | Cloudflare Queue | R2 |
-| 企业版 SaaS | Cloudflare Queue | R2 |
-| 企业版私有（简单） | 内存队列 | 文件日志 |
-| 企业版私有（企业） | Redis | Loki/ELK |
+| Deployment | Message Queue | Log Service |
+|------------|---------------|-------------|
+| Community dashboard | Cloudflare Queue | R2 |
+| Enterprise SaaS | Cloudflare Queue | R2 |
+| Enterprise private (simple) | In-memory queue | File logging |
+| Enterprise private (enterprise) | Redis | Loki/ELK |
 
-### 许可证
+### Licensing
 
-| 版本 | 许可证 | 说明 |
-|------|--------|------|
-| 社区版 | Apache 2.0 | 完全开源，允许商业使用 |
-| 企业版 | 商业许可证 | 闭源，付费使用 |
+| Version | License | Description |
+|---------|---------|-------------|
+| Community Edition | Apache 2.0 | Fully open source, commercial use allowed |
+| Enterprise Edition | Commercial License | Closed source, paid use |
 
-### 收入模式
+### Revenue Model
 
-| 收入来源 | 说明 |
-|----------|------|
-| 企业版授权 | 一次性或年度订阅 |
-| 技术支持 | 按小时或包月 |
-| 定制开发 | 项目制收费 |
+| Revenue Source | Description |
+|----------------|-------------|
+| Enterprise license | One-time or annual subscription |
+| Technical support | Hourly or monthly |
+| Custom development | Project-based pricing |
 
-### SaaS 托管（后续）
+### SaaS Hosting (Future)
 
-等企业版收入稳定后考虑：
+Consider after enterprise revenue stabilizes:
 
-| 套餐 | 价格 | 隔离级别 |
-|------|------|----------|
-| 专业版 | $99/月 | 共享实例 |
-| 商业版 | $499/月 | 独立实例 |
-| 企业版 | $2999/月 | 独立集群 + GPU |
+| Plan | Price | Isolation Level |
+|------|-------|-----------------|
+| Professional | $99/month | Shared instance |
+| Business | $499/month | Dedicated instance |
+| Enterprise | $2999/month | Dedicated cluster + GPU |
 
-### 检测服务分层
+### Detection Service Tiers
 
-| 客户类型 | 检测方案 |
-|----------|----------|
-| 个人/小团队 | Cloudflare AI（免费额度） |
-| 中型企业 | Cloudflare AI 或共享 GPU |
-| 大型企业 | 独立 GPU 或私有部署 |
+| Customer Type | Detection Solution |
+|---------------|-------------------|
+| Individual/Small team | Cloudflare AI (free tier) |
+| Medium enterprise | Cloudflare AI or shared GPU |
+| Large enterprise | Dedicated GPU or private deployment |
 
-### 开源运营
+### Open Source Operations
 
-| 渠道 | 用途 | 成本 |
-|------|------|------|
-| GitHub | 代码托管、Issue、PR | 免费 |
-| GitHub Discussions | 问答、讨论 | 免费 |
-| GitHub Pages | 文档 | 免费 |
-| GitHub Actions | CI/CD | 免费 |
-| npm | 包发布 | 免费 |
-| Docker Hub | 镜像发布 | 免费 |
+| Channel | Use Case | Cost |
+|---------|----------|------|
+| GitHub | Code hosting, Issues, PRs | Free |
+| GitHub Discussions | Q&A, discussions | Free |
+| GitHub Pages | Documentation | Free |
+| GitHub Actions | CI/CD | Free |
+| npm | Package publishing | Free |
+| Docker Hub | Image publishing | Free |
