@@ -4,6 +4,7 @@ export interface BrowserLLMConfig {
   model: string;
   temperature?: number;
   maxTokens?: number;
+  useLocalModels?: boolean;  // Use locally deployed models
 }
 
 export interface DetectionResult {
@@ -41,17 +42,30 @@ If no sensitive information found, return empty array: []
 Text to analyze:
 `;
 
+// Local model configuration
+const WEBLLM_VERSION = 'v0_2_49';
+
+// Model library file mapping
+const MODEL_LIB_FILES: Record<string, string> = {
+  'Llama-3.2-1B-Instruct-q4f16_1-MLC': 'Llama-3_2-1B-Instruct-q4f16_1-ctx4k_cs1k-webgpu.wasm',
+  'Qwen2.5-1.5B-Instruct-q4f16_1-MLC': 'Qwen2_5-1_5B-Instruct-q4f16_1-ctx4k_cs1k-webgpu.wasm',
+  'gemma-2-2b-it-q4f16_1-MLC': 'gemma-2-2b-it-q4f16_1-ctx4k_cs1k-webgpu.wasm',
+  'Phi-3.5-mini-instruct-q4f16_1-MLC': 'Phi-3_5-mini-instruct-q4f16_1-ctx4k_cs1k-webgpu.wasm',
+};
+
 export class BrowserLLMDetector {
   private engine: webllm.MLCEngine | null = null;
   private modelId: string;
   private temperature: number;
   private maxTokens: number;
+  private useLocalModels: boolean;
   private loadingCallback?: (progress: number, text: string) => void;
 
   constructor(config: BrowserLLMConfig) {
     this.modelId = config.model;
     this.temperature = config.temperature ?? 0.1;
     this.maxTokens = config.maxTokens ?? 2048;
+    this.useLocalModels = config.useLocalModels ?? false;
   }
 
   onLoading(callback: (progress: number, text: string) => void) {
@@ -61,17 +75,42 @@ export class BrowserLLMDetector {
   async initialize(): Promise<void> {
     if (this.engine) return;
 
-    this.engine = new webllm.MLCEngine();
-
-    // Set up progress callback before reload
-    this.engine.setInitProgressCallback((report: webllm.InitProgressReport) => {
+    // Set up progress callback
+    const initProgressCallback = (report: webllm.InitProgressReport) => {
       if (this.loadingCallback) {
         this.loadingCallback(report.progress, report.text);
       }
-    });
+    };
 
-    // Load model - WebLLM will download from HuggingFace or use cached version
-    await this.engine.reload(this.modelId);
+    if (this.useLocalModels) {
+      // Use locally deployed models from /models/
+      const modelLibFile = MODEL_LIB_FILES[this.modelId];
+      if (!modelLibFile) {
+        throw new Error(`Unknown model: ${this.modelId}`);
+      }
+
+      const appConfig: webllm.AppConfig = {
+        model_list: [
+          {
+            model: `/models/${this.modelId}`,  // Local path
+            model_id: this.modelId,
+            model_lib: `/models/${this.modelId}/${modelLibFile}`,  // Local WASM
+          }
+        ],
+      };
+
+      // Use CreateMLCEngine for local models (supports appConfig)
+      this.engine = await webllm.CreateMLCEngine(
+        this.modelId,
+        { appConfig, initProgressCallback }
+      );
+    } else {
+      // Use HuggingFace (online) - use CreateMLCEngine with progress callback
+      this.engine = await webllm.CreateMLCEngine(
+        this.modelId,
+        { initProgressCallback }
+      );
+    }
   }
 
   async detect(text: string): Promise<DetectionResult> {
@@ -129,10 +168,9 @@ export class BrowserLLMDetector {
 }
 
 // Available models for browser
-// To use offline, download models to public/assets/models/
 export const AVAILABLE_BROWSER_MODELS = [
-  { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC', name: 'Phi-3.5 Mini (4-bit)', size: '~2GB' },
-  { id: 'gemma-2-2b-it-q4f16_1-MLC', name: 'Gemma 2 2B (4-bit)', size: '~1.4GB' },
+  { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', name: 'Llama 3.2 1B (4-bit)', size: '~700MB', recommended: true },
   { id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', name: 'Qwen 2.5 1.5B (4-bit)', size: '~1GB' },
-  { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', name: 'Llama 3.2 1B (4-bit)', size: '~700MB' },
+  { id: 'gemma-2-2b-it-q4f16_1-MLC', name: 'Gemma 2 2B (4-bit)', size: '~1.4GB' },
+  { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC', name: 'Phi-3.5 Mini (4-bit)', size: '~2GB' },
 ];

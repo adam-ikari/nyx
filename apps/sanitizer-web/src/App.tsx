@@ -22,13 +22,14 @@ export function App() {
   const [sensitiveCount, setSensitiveCount] = useState(0)
 
   // WebLLM state
-  const [modelId, setModelId] = useState(AVAILABLE_BROWSER_MODELS[3].id) // Default to smallest
+  const [modelId, setModelId] = useState(AVAILABLE_BROWSER_MODELS[0].id) // Default to smallest (Llama 3.2 1B)
   const [detector, setDetector] = useState<BrowserLLMDetector | null>(null)
   const [modelLoading, setModelLoading] = useState(false)
   const [modelLoadingText, setModelLoadingText] = useState('')
   const [modelLoadingProgress, setModelLoadingProgress] = useState(0)
   const [browserSupport, setBrowserSupport] = useState<BrowserSupport | null>(null)
   const [mapping, setMapping] = useState<Map<string, string>>(new Map())
+  const [useLocalModels, setUseLocalModels] = useState(false)  // Toggle for offline models
 
   // Check browser support on mount
   useEffect(() => {
@@ -58,8 +59,8 @@ export function App() {
       setError('Cache API not available. Cannot store models.')
       return
     }
-    if (!browserSupport?.networkOnline) {
-      setError('Network offline. Cannot download models.')
+    if (!useLocalModels && !browserSupport?.networkOnline) {
+      setError('Network offline. Cannot download models from HuggingFace. Enable offline mode to use local models.')
       return
     }
 
@@ -69,7 +70,7 @@ export function App() {
     setError(null)
 
     try {
-      const newDetector = new BrowserLLMDetector({ model: modelId })
+      const newDetector = new BrowserLLMDetector({ model: modelId, useLocalModels })
       newDetector.onLoading((progress, text) => {
         setModelLoadingProgress(progress)
         setModelLoadingText(text)
@@ -84,7 +85,7 @@ export function App() {
     } finally {
       setModelLoading(false)
     }
-  }, [modelId, browserSupport])
+  }, [modelId, browserSupport, useLocalModels])
 
   const handleProcess = useCallback(async () => {
     if (!inputText.trim()) {
@@ -223,12 +224,25 @@ export function App() {
                 >
                   {AVAILABLE_BROWSER_MODELS.map((model) => (
                     <option key={model.id} value={model.id}>
-                      {model.name} ({model.size})
+                      {model.name} ({model.size}){model.recommended ? ' - Recommended' : ''}
                     </option>
                   ))}
                 </select>
               </div>
-              <Button onClick={loadModel} disabled={modelLoading || !browserSupport?.webgpu || !browserSupport?.caches}>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="offlineMode"
+                  checked={useLocalModels}
+                  onChange={(e) => setUseLocalModels(e.target.checked)}
+                  disabled={modelLoading}
+                  className="h-4 w-4"
+                />
+                <label htmlFor="offlineMode" className="text-sm text-muted-foreground">
+                  Offline mode (local models)
+                </label>
+              </div>
+              <Button onClick={loadModel} disabled={modelLoading || !browserSupport?.webgpu || !browserSupport?.caches || (!useLocalModels && !browserSupport?.networkOnline)}>
                 {modelLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
