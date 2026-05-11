@@ -1,9 +1,44 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Shield, Copy, Trash2, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react'
+import { Shield, Copy, Trash2, CheckCircle, AlertCircle, Loader2, RefreshCw, Download, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { BrowserLLMDetector, AVAILABLE_BROWSER_MODELS } from '@/lib/browser-llm'
+
+const SESSION_STORAGE_KEY = 'nyx-sanitizer-session'
+
+interface SessionData {
+  sessionId: string
+  mapping: Array<[string, string]>
+  createdAt: number
+}
+
+function loadSession(): { sessionId: string; mapping: Map<string, string> } | null {
+  try {
+    const stored = sessionStorage.getItem(SESSION_STORAGE_KEY)
+    if (!stored) return null
+    const data: SessionData = JSON.parse(stored)
+    return {
+      sessionId: data.sessionId,
+      mapping: new Map(data.mapping)
+    }
+  } catch {
+    return null
+  }
+}
+
+function saveSession(sessionId: string, mapping: Map<string, string>) {
+  const data: SessionData = {
+    sessionId,
+    mapping: Array.from(mapping.entries()),
+    createdAt: Date.now()
+  }
+  sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data))
+}
+
+function clearSession() {
+  sessionStorage.removeItem(SESSION_STORAGE_KEY)
+}
 
 export function App() {
   const [mode, setMode] = useState<'sanitize' | 'restore'>('sanitize')
@@ -24,9 +59,16 @@ export function App() {
   const [webgpuAvailable, setWebgpuAvailable] = useState(false)
   const [mapping, setMapping] = useState<Map<string, string>>(new Map())
 
-  // Check WebGPU support on mount
+  // Check WebGPU support and load saved session on mount
   useEffect(() => {
     setWebgpuAvailable('gpu' in navigator)
+
+    // Restore session from storage
+    const saved = loadSession()
+    if (saved) {
+      setSessionId(saved.sessionId)
+      setMapping(saved.mapping)
+    }
   }, [])
 
   const loadModel = useCallback(async () => {
@@ -92,9 +134,13 @@ export function App() {
 
         setOutputText(sanitized)
         setMapping(newMapping)
-        setSessionId(`session-${Date.now()}`)
+        const newSessionId = `session-${Date.now()}`
+        setSessionId(newSessionId)
         setSensitiveCount(result.sensitive.length)
         setSuccess(`Found ${result.sensitive.length} sensitive items`)
+
+        // Save session
+        saveSession(newSessionId, newMapping)
       } else {
         let restored = inputText
         let complete = true
@@ -131,6 +177,50 @@ export function App() {
     setSuccess(null)
     setMapping(new Map())
     setSensitiveCount(0)
+    clearSession()
+  }
+
+  const handleExportMapping = () => {
+    if (mapping.size === 0) {
+      setError('No mapping to export')
+      return
+    }
+    const data = {
+      sessionId,
+      mapping: Array.from(mapping.entries()),
+      exportedAt: new Date().toISOString()
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `nyx-mapping-${sessionId}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setSuccess('Mapping exported!')
+  }
+
+  const handleImportMapping = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+      try {
+        const text = await file.text()
+        const data = JSON.parse(text)
+        if (data.mapping && Array.isArray(data.mapping)) {
+          const newMapping = new Map<string, string>(data.mapping)
+          setMapping(newMapping)
+          setSessionId(data.sessionId || `imported-${Date.now()}`)
+          setSuccess(`Imported mapping with ${newMapping.size} entries`)
+        }
+      } catch {
+        setError('Failed to import mapping file')
+      }
+    }
+    input.click()
   }
 
   return (
@@ -300,6 +390,14 @@ export function App() {
             <Copy className="h-4 w-4 mr-2" />
             Copy Output
           </Button>
+          <Button variant="outline" onClick={handleExportMapping} disabled={mapping.size === 0}>
+            <Download className="h-4 w-4 mr-2" />
+            Export Mapping
+          </Button>
+          <Button variant="outline" onClick={handleImportMapping}>
+            <Upload className="h-4 w-4 mr-2" />
+            Import Mapping
+          </Button>
           <Button variant="outline" onClick={handleClear}>
             <Trash2 className="h-4 w-4 mr-2" />
             Clear
@@ -333,8 +431,8 @@ export function App() {
                 <span>{mode}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Sensitive Items:</span>
-                <span>{sensitiveCount}</span>
+                <span className="text-muted-foreground">Mapping Entries:</span>
+                <span>{mapping.size}</span>
               </div>
             </div>
           </CardContent>
