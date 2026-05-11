@@ -53,7 +53,7 @@ export class RequestMapper {
   restore(text: string): string {
     let result = text;
     for (const [placeholder, original] of this.mapping) {
-      result = result.replace(placeholder, original);
+      result = result.replaceAll(placeholder, original);
     }
     return result;
   }
