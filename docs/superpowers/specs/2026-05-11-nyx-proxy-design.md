@@ -672,7 +672,39 @@ Nyx startup → Connect to dashboard → Register instance → Maintain heartbea
 
 ## MVP Version Scope
 
-### Included
+### Phase 1: Sanitizer Tool (Current Focus)
+
+A standalone sanitization tool that allows users to manually sanitize content before sending to cloud AI tools and restore responses.
+
+**Deployment Forms:**
+- Desktop Application (Tauri 2.0)
+- Cloud Deployment (Vercel / Cloudflare Workers)
+- Dashboard Integration (as part of management platform)
+
+**Features:**
+- Manual sanitization: Input sensitive text → Output sanitized text
+- Response restoration: Paste AI response → Restore original values
+- Session management: Track mappings during session
+- OpenAI-compatible API configuration (Ollama, LocalAI, vLLM, etc.)
+
+**Included Modules:**
+
+| Module | Features |
+|--------|----------|
+| @nyx-proxy/core | Detection + Replacement + Restoration |
+| @nyx-proxy/sanitizer | Sanitizer class + Session management |
+| @nyx-proxy/sanitizer-desktop | Tauri desktop application |
+| @nyx-proxy/sanitizer-web | Cloud deployment (API + Web UI) |
+
+**Deployment Modes:**
+- **Client Mode**: All processing locally (desktop app)
+- **Frontend-Backend Mode**: Frontend calls backend API (web app / dashboard integration)
+
+### Phase 2: Nyx Proxy Gateway
+
+Full LLM gateway with automatic API interception.
+
+**Included Modules:**
 
 | Module | Features |
 |--------|----------|
@@ -687,14 +719,31 @@ Nyx startup → Connect to dashboard → Register instance → Maintain heartbea
 | @nyx-proxy/backends/worker | Validate core functionality first |
 | @nyx-proxy/dashboard | Validate core functionality first |
 
-### MVP Development Tasks
+### Phase 1 Development Tasks
 
-1. **Project Initialization**
-   - Monorepo structure
-   - pnpm workspace configuration
-   - TypeScript configuration
+1. **@nyx-proxy/sanitizer**
+   - Sanitizer class (sanitize + restore)
+   - SessionManager for mapping tracking
+   - OpenAI-compatible API client
 
-2. **@nyx-proxy/core**
+2. **@nyx-proxy/sanitizer-desktop (Tauri)**
+   - Desktop UI with input/output areas
+   - Mode toggle (Sanitize / Restore)
+   - Configuration panel
+   - System tray integration
+
+3. **@nyx-proxy/sanitizer-web**
+   - REST API endpoints (/sanitize, /restore)
+   - Simple web UI
+   - Session-based workflow
+
+4. **Integration Testing**
+   - End-to-end testing
+   - Local LLM connection testing
+
+### Phase 2 Development Tasks
+
+1. **@nyx-proxy/core**
    - Type definitions
    - Interface definitions
    - Detection engine
@@ -702,17 +751,17 @@ Nyx startup → Connect to dashboard → Register instance → Maintain heartbea
    - Restoration engine
    - Proxy forwarding
 
-3. **@nyx-proxy/backends (Node.js)**
+2. **@nyx-proxy/backends (Node.js)**
    - File logging
    - Node HTTP client
    - Local storage
 
-4. **@nyx-proxy/cli**
+3. **@nyx-proxy/cli**
    - Start command
    - Status command
    - Config loading
 
-5. **Integration Testing**
+4. **Integration Testing**
    - End-to-end testing
    - Local LLM connection testing
 

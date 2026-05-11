@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nyx Sanitizer - Privacy Protection Tool</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #e0e0e0;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      padding: 30px 0;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      background: linear-gradient(90deg, #00d9ff, #00ff88);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      color: #888;
+      font-size: 1.1rem;
+    }
+
+    .mode-toggle {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin: 20px 0;
+    }
+
+    .mode-btn {
+      padding: 12px 30px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.3s;
+      background: #2a2a4a;
+      color: #888;
+    }
+
+    .mode-btn.active {
+      background: linear-gradient(90deg, #00d9ff, #00ff88);
+      color: #1a1a2e;
+      font-weight: bold;
+    }
+
+    .mode-btn:hover:not(.active) {
+      background: #3a3a5a;
+    }
+
+    .main-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .panel {
+      background: #2a2a4a;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .panel-title {
+      font-size: 1.2rem;
+      color: #00d9ff;
+    }
+
+    textarea {
+      width: 100%;
+      height: 300px;
+      background: #1a1a2e;
+      border: 1px solid #3a3a5a;
+      border-radius: 8px;
+      padding: 15px;
+      color: #e0e0e0;
+      font-size: 1rem;
+      resize: vertical;
+      font-family: 'Monaco', 'Menlo', monospace;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #00d9ff;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.3s;
+      margin-top: 15px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(90deg, #00d9ff, #00ff88);
+      color: #1a1a2e;
+      font-weight: bold;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0, 217, 255, 0.4);
+    }
+
+    .btn-secondary {
+      background: #3a3a5a;
+      color: #e0e0e0;
+    }
+
+    .btn-secondary:hover {
+      background: #4a4a6a;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .status-bar {
+      margin-top: 20px;
+      padding: 15px;
+      background: #1a1a2e;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      border-bottom: 1px solid #2a2a4a;
+    }
+
+    .status-item:last-child {
+      border-bottom: none;
+    }
+
+    .config-panel {
+      margin-top: 20px;
+      padding: 20px;
+      background: #2a2a4a;
+      border-radius: 12px;
+    }
+
+    .config-row {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 10px;
+      margin-bottom: 15px;
+      align-items: center;
+    }
+
+    .config-row label {
+      color: #888;
+    }
+
+    .config-row input {
+      padding: 10px;
+      background: #1a1a2e;
+      border: 1px solid #3a3a5a;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-size: 0.95rem;
+    }
+
+    .config-row input:focus {
+      outline: none;
+      border-color: #00d9ff;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .loading.active {
+      display: block;
+    }
+
+    .spinner {
+      border: 3px solid #3a3a5a;
+      border-top: 3px solid #00d9ff;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .error-message {
+      background: #ff4444;
+      color: white;
+      padding: 10px 15px;
+      border-radius: 6px;
+      margin-top: 15px;
+      display: none;
+    }
+
+    .error-message.active {
+      display: block;
+    }
+
+    .success-message {
+      background: #00ff88;
+      color: #1a1a2e;
+      padding: 10px 15px;
+      border-radius: 6px;
+      margin-top: 15px;
+      display: none;
+    }
+
+    .success-message.active {
+      display: block;
+    }
+
+    @media (max-width: 768px) {
+      .main-content {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🛡️ Nyx Sanitizer</h1>
+      <p class="subtitle">Privacy-preserving content sanitization for AI interactions</p>
+    </header>
+
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="sanitizeMode">Sanitize</button>
+      <button class="mode-btn" id="restoreMode">Restore</button>
+    </div>
+
+    <div class="main-content">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title" id="inputTitle">Input (Sensitive Content)</span>
+        </div>
+        <textarea id="inputText" placeholder="Enter text with sensitive information..."></textarea>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title" id="outputTitle">Output (Sanitized)</span>
+        </div>
+        <textarea id="outputText" placeholder="Sanitized text will appear here..." readonly></textarea>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="processBtn">Sanitize</button>
+      <button class="btn btn-secondary" id="copyBtn">Copy Output</button>
+      <button class="btn btn-secondary" id="clearBtn">Clear All</button>
+    </div>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <p>Processing...</p>
+    </div>
+
+    <div class="error-message" id="errorMessage"></div>
+    <div class="success-message" id="successMessage"></div>
+
+    <div class="status-bar">
+      <div class="status-item">
+        <span>Session ID:</span>
+        <span id="sessionId">-</span>
+      </div>
+      <div class="status-item">
+        <span>Detection Status:</span>
+        <span id="detectionStatus">-</span>
+      </div>
+      <div class="status-item">
+        <span>Sensitive Items Found:</span>
+        <span id="sensitiveCount">0</span>
+      </div>
+    </div>
+
+    <div class="config-panel">
+      <h3 style="margin-bottom: 15px; color: #00d9ff;">LLM Configuration</h3>
+      <div class="config-row">
+        <label>API Endpoint:</label>
+        <input type="text" id="configEndpoint" value="http://localhost:11434/v1" placeholder="http://localhost:11434/v1">
+      </div>
+      <div class="config-row">
+        <label>Model:</label>
+        <input type="text" id="configModel" value="gemma4" placeholder="gemma4">
+      </div>
+      <div class="config-row">
+        <label>API Key (optional):</label>
+        <input type="password" id="configApiKey" placeholder="Leave empty for local LLM">
+      </div>
+      <button class="btn btn-secondary" id="saveConfigBtn">Save Configuration</button>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let currentMode = 'sanitize';
+    let currentSessionId = null;
+
+    // DOM Elements
+    const sanitizeModeBtn = document.getElementById('sanitizeMode');
+    const restoreModeBtn = document.getElementById('restoreMode');
+    const inputText = document.getElementById('inputText');
+    const outputText = document.getElementById('outputText');
+    const inputTitle = document.getElementById('inputTitle');
+    const outputTitle = document.getElementById('outputTitle');
+    const processBtn = document.getElementById('processBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const loading = document.getElementById('loading');
+    const errorMessage = document.getElementById('errorMessage');
+    const successMessage = document.getElementById('successMessage');
+    const sessionIdEl = document.getElementById('sessionId');
+    const detectionStatus = document.getElementById('detectionStatus');
+    const sensitiveCount = document.getElementById('sensitiveCount');
+    const configEndpoint = document.getElementById('configEndpoint');
+    const configModel = document.getElementById('configModel');
+    const configApiKey = document.getElementById('configApiKey');
+    const saveConfigBtn = document.getElementById('saveConfigBtn');
+
+    // Mode Toggle
+    sanitizeModeBtn.addEventListener('click', () => {
+      currentMode = 'sanitize';
+      sanitizeModeBtn.classList.add('active');
+      restoreModeBtn.classList.remove('active');
+      inputTitle.textContent = 'Input (Sensitive Content)';
+      outputTitle.textContent = 'Output (Sanitized)';
+      processBtn.textContent = 'Sanitize';
+      inputText.placeholder = 'Enter text with sensitive information...';
+      outputText.placeholder = 'Sanitized text will appear here...';
+    });
+
+    restoreModeBtn.addEventListener('click', () => {
+      currentMode = 'restore';
+      restoreModeBtn.classList.add('active');
+      sanitizeModeBtn.classList.remove('active');
+      inputTitle.textContent = 'Input (AI Response with Placeholders)';
+      outputTitle.textContent = 'Output (Restored)';
+      processBtn.textContent = 'Restore';
+      inputText.placeholder = 'Paste AI response with placeholders...';
+      outputText.placeholder = 'Restored text will appear here...';
+    });
+
+    // Process
+    processBtn.addEventListener('click', async () => {
+      const text = inputText.value.trim();
+      if (!text) {
+        showError('Please enter some text');
+        return;
+      }
+
+      hideMessages();
+      loading.classList.add('active');
+
+      try {
+        const config = {
+          endpoint: configEndpoint.value,
+          model: configModel.value,
+          apiKey: configApiKey.value || undefined
+        };
+
+        if (currentMode === 'sanitize') {
+          const response = await fetch('/api/sanitize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, config })
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || 'Sanitization failed');
+          }
+
+          outputText.value = data.sanitized;
+          currentSessionId = data.sessionId;
+          sessionIdEl.textContent = data.sessionId;
+          detectionStatus.textContent = 'Detected';
+          sensitiveCount.textContent = data.detection?.sensitive?.length || 0;
+          showSuccess('Text sanitized successfully!');
+
+        } else {
+          if (!currentSessionId) {
+            throw new Error('No active session. Please sanitize text first.');
+          }
+
+          const response = await fetch('/api/restore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, sessionId: currentSessionId })
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || 'Restoration failed');
+          }
+
+          outputText.value = data.restored;
+          showSuccess(data.complete ? 'Text restored successfully!' : 'Text restored (some placeholders not found)');
+        }
+
+      } catch (error) {
+        showError(error.message);
+      } finally {
+        loading.classList.remove('active');
+      }
+    });
+
+    // Copy
+    copyBtn.addEventListener('click', () => {
+      if (outputText.value) {
+        navigator.clipboard.writeText(outputText.value);
+        showSuccess('Copied to clipboard!');
+      }
+    });
+
+    // Clear
+    clearBtn.addEventListener('click', () => {
+      inputText.value = '';
+      outputText.value = '';
+      hideMessages();
+    });
+
+    // Save Config
+    saveConfigBtn.addEventListener('click', async () => {
+      try {
+        const response = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            endpoint: configEndpoint.value,
+            model: configModel.value,
+            apiKey: configApiKey.value || undefined
+          })
+        });
+
+        if (response.ok) {
+          showSuccess('Configuration saved!');
+        }
+      } catch (error) {
+        showError('Failed to save configuration');
+      }
+    });
+
+    // Helpers
+    function showError(message) {
+      errorMessage.textContent = message;
+      errorMessage.classList.add('active');
+      successMessage.classList.remove('active');
+    }
+
+    function showSuccess(message) {
+      successMessage.textContent = message;
+      successMessage.classList.add('active');
+      errorMessage.classList.remove('active');
+    }
+
+    function hideMessages() {
+      errorMessage.classList.remove('active');
+      successMessage.classList.remove('active');
+    }
+
+    // Load config on start
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(config => {
+        configEndpoint.value = config.endpoint || 'http://localhost:11434/v1';
+        configModel.value = config.model || 'gemma4';
+      })
+      .catch(() => {});
+  </script>
+</body>
+</html>
