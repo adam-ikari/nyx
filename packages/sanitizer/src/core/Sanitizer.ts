@@ -110,7 +110,7 @@ export class Sanitizer {
         throw new Error(`Detection failed: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
       const content = data.choices?.[0]?.message?.content || '[]';
 
       return this.parseDetectionResult(content);

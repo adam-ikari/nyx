@@ -70,6 +70,7 @@ export class BrowserLLMDetector {
       }
     });
 
+    // Load model - WebLLM will download from HuggingFace or use cached version
     await this.engine.reload(this.modelId);
   }
 
@@ -128,6 +129,7 @@ export class BrowserLLMDetector {
 }
 
 // Available models for browser
+// To use offline, download models to public/assets/models/
 export const AVAILABLE_BROWSER_MODELS = [
   { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC', name: 'Phi-3.5 Mini (4-bit)', size: '~2GB' },
   { id: 'gemma-2-2b-it-q4f16_1-MLC', name: 'Gemma 2 2B (4-bit)', size: '~1.4GB' },

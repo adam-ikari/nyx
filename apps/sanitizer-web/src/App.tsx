@@ -59,7 +59,7 @@ export function App() {
       return
     }
     if (!browserSupport?.networkOnline) {
-      setError('Network offline. Cannot download models from HuggingFace.')
+      setError('Network offline. Cannot download models.')
       return
     }
 
